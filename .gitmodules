@@ -1,0 +1,28 @@
+[submodule "src/thirdparty/realsense_gazebo_plugin"]
+	path = src/thirdparty/realsense_gazebo_plugin
+	url = https://github.com/pal-robotics/realsense_gazebo_plugin
+	branch = new_maintainer
+[submodule "src/thirdparty/create3_sim"]
+	path = src/thirdparty/create3_sim
+	url = https://github.com/iRobotEducation/create3_sim
+	branch = humble
+[submodule "src/thirdparty/aws-robomaker-small-house-world"]
+	path = src/thirdparty/aws-robomaker-small-house-world
+	url = https://github.com/aws-robotics/aws-robomaker-small-house-world
+	branch = ros2
+[submodule "src/thirdparty/slam_toolbox"]
+	path = src/thirdparty/slam_toolbox
+	url = https://github.com/SteveMacenski/slam_toolbox
+	branch = humble
+[submodule "src/simulation/aws-robomaker-small-house-world"]
+	path = src/simulation/aws-robomaker-small-house-world
+	url = https://github.com/aws-robotics/aws-robomaker-small-house-world
+	branch = ros2
+[submodule "src/simulation/create3_sim"]
+	path = src/simulation/create3_sim
+	url = https://github.com/iRobotEducation/create3_sim
+	branch = humble
+[submodule "src/simulation/realsense_gazebo_plugin"]
+	path = src/simulation/realsense_gazebo_plugin
+	url = https://github.com/pal-robotics/realsense_gazebo_plugin
+	branch = new_maintainer
