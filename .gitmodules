@@ -1,4 +1,0 @@
-[submodule "src/thirdparty/slam_toolbox"]
-	path = src/thirdparty/slam_toolbox
-	url = https://github.com/SteveMacenski/slam_toolbox
-	branch = humble

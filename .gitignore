@@ -1,0 +1,5 @@
+snap_ws/*
+.vscode/*
+build/
+install/
+log/
