@@ -10,8 +10,8 @@
 #include <karto_sdk/Karto.h>
 #include <rcpputils/filesystem_helper.hpp>
 
-
 #include "multi_sensor_slam/camera_feature_extraction_node.hpp"
+#include "multi_sensor_slam/feature_matching.hpp"
 
 using namespace std;
 using namespace cv;
@@ -25,7 +25,7 @@ CameraFeatureExtractionNode::CameraFeatureExtractionNode(
 
     RCLCPP_INFO(this->get_logger(), "Initializing Camera Feature Extraction Node...");
 
-    feature_extractor_ = std::make_shared<camera_utils::FeatureExtraction>();
+    feature_extractor_ = std::make_shared<camera_utils::FeatureExtractor>();
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, this);
     last_image_msg_ = nullptr;

@@ -11,14 +11,17 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <karto_sdk/Karto.h>
 
-#include "multi_sensor_slam/camera_utils.hpp"
+// #include "multi_sensor_slam/camera_utils.hpp"
 #include "multi_sensor_slam/ORBextractor.h"
+#include "multi_sensor_slam/keyframes.hpp"
+#include "multi_sensor_slam/feature_extraction.hpp"
+#include "multi_sensor_slam/feature_matching.hpp"
 
 
 class CameraFeatureExtractionNode : public rclcpp::Node {
 public:
     CameraFeatureExtractionNode(std::shared_ptr<camera_utils::KeyframeHolder> keyframe_holder);
-    std::shared_ptr<camera_utils::FeatureExtraction> feature_extractor_; 
+    std::shared_ptr<camera_utils::FeatureExtractor> feature_extractor_; 
     karto::Pose2 getRobotPose();
     karto::Pose2 previous_keyframe_pose_;
 private:

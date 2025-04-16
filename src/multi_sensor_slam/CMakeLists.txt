@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/CMake/")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/karto_sdk/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/DBoW2/cmake)
 
 find_package(ament_cmake REQUIRED)
 find_package(message_filters REQUIRED)
@@ -35,6 +36,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 
 set(BUILD_SHARED_LIBS ON)
 add_subdirectory(lib/karto_sdk)
+add_subdirectory(lib/DBoW2)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(dependencies
@@ -63,7 +65,6 @@ set(dependencies
   cv_bridge
 )
 
-
 find_package(PkgConfig REQUIRED)
 find_package(Eigen3 REQUIRED)
 # find_package(CHOLMOD REQUIRED)
@@ -72,11 +73,12 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 add_definitions(-DQT_NO_KEYWORDS)
 find_package(Boost REQUIRED system serialization filesystem thread)
 
-
 # Include directories
 include_directories(
   include
-  include lib/karto_sdk/include
+  lib/karto_sdk/include
+  lib/DBoW2
+  lib/DBoW2/DBoW2
   ${EIGEN3_INCLUDE_DIRS}
   # ${CHOLMOD_INCLUDE_DIR}
   ${Boost_INCLUDE_DIRS}
@@ -93,22 +95,54 @@ add_definitions(${OpenCV_DEFINITIONS})
 #   NO_DEFAULT_PATH
 #   REQUIRED
 # )
+
+target_include_directories(DBoW2 PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}
+)
 # ORBextractor
 add_library(ORBextractor src/ORBextractor.cpp)
 target_link_libraries(ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES})
 ament_target_dependencies(ORBextractor rclcpp sensor_msgs std_msgs cv_bridge OpenCV)
 
-# camera_utils
-add_library(camera_utils src/camera_utils.cpp)
-target_link_libraries(camera_utils ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
-ament_target_dependencies(camera_utils rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
+add_library(feature_matching src/feature_matching.cpp)
+target_link_libraries(feature_matching ORBextractor DBoW2 kartoSlamToolbox ${OpenCV_LIBRARIES})
+ament_target_dependencies(feature_matching rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
 
-# Main feature extraction node
-add_executable(camera_feature_extractor src/camera_feature_extraction_node.cpp)
-target_link_libraries(camera_feature_extractor camera_utils ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
-ament_target_dependencies(camera_feature_extractor rclcpp sensor_msgs tf2 tf2_ros tf2_geometry_msgs cv_bridge OpenCV)
+# # camera_utils
+# add_library(camera_utils src/camera_utils.cpp)
+# target_link_libraries(camera_utils ORBextractor DBoW2 kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
+# ament_target_dependencies(camera_utils rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
+
+# keyframes
+add_library(keyframes src/keyframes.cpp)
+target_link_libraries(keyframes ORBextractor DBoW2 kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
+ament_target_dependencies(keyframes rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
+
+# # Main feature extraction node
+# add_executable(camera_feature_extractor src/camera_feature_extraction_node.cpp)
+# target_link_libraries(camera_feature_extractor ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
+# ament_target_dependencies(camera_feature_extractor rclcpp sensor_msgs tf2 tf2_ros tf2_geometry_msgs cv_bridge OpenCV)
+
+# add_library(camera_loop_closure_assistant src/camera_loop_closure_assistant.cpp)
+# target_link_libraries(camera_loop_closure_assistant ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
+# ament_target_dependencies(camera_loop_closure_assistant rclcpp tf2_geometry_msgs nav_msgs visualization_msgs std_srvs tf2_ros OpenCV)
 
 
+install(TARGETS DBoW2
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY DBoW2/
+  DESTINATION include/DBoW2
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY DUtils/
+  DESTINATION include/DUtils
+  FILES_MATCHING PATTERN "*.h"
+)
 install(
   PROGRAMS src/tf_broadcaster_node.py
   DESTINATION lib/${PROJECT_NAME}
@@ -126,8 +160,20 @@ install(TARGETS ORBextractor
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
- 
-install(TARGETS camera_utils
+
+install(TARGETS feature_matching
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+# install(TARGETS camera_utils
+#   ARCHIVE DESTINATION lib
+#   LIBRARY DESTINATION lib
+#   RUNTIME DESTINATION bin
+# )
+
+install(TARGETS keyframes
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

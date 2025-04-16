@@ -3,3 +3,4 @@ snap_ws/*
 /build/
 install/
 log/
+data/

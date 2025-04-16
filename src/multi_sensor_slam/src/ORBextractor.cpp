@@ -74,8 +74,7 @@ using namespace std;
 
 namespace orb
 {
-
-
+    
 static float IC_Angle(const Mat& image, Point2f pt,  const vector<int> & u_max)
 {
     int m_01 = 0, m_10 = 0;
