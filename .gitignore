@@ -4,3 +4,7 @@ snap_ws/*
 install/
 log/
 data/
+test/
+keyframes/
+rosbag2_2025_05_09-07_54_07/
+loop_matches/
