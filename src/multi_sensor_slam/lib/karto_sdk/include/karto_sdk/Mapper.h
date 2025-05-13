@@ -662,7 +662,7 @@ public:
     }
     m_Vertices.clear();
 
-    forEach(typename std::vector<Edge<T> *>, &m_Edges)
+    forEachR(typename std::vector<Edge<T> *>, &m_Edges)
     {
       delete *iter;
       *iter = nullptr;
