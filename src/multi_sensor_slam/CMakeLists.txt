@@ -5,7 +5,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/CMake/")
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/karto_sdk/cmake)
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/DBoW2/cmake)
 
 find_package(ament_cmake REQUIRED)
 find_package(message_filters REQUIRED)
@@ -33,6 +32,7 @@ find_package(OpenCV REQUIRED)
 find_package(PCL REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(pcl_conversions REQUIRED)
 
 set(BUILD_SHARED_LIBS ON)
 add_subdirectory(lib/karto_sdk)
@@ -79,70 +79,72 @@ include_directories(
   lib/karto_sdk/include
   lib/DBoW2
   lib/DBoW2/DBoW2
+  lib/DBOW2/include
   ${EIGEN3_INCLUDE_DIRS}
-  # ${CHOLMOD_INCLUDE_DIR}
   ${Boost_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
   ${rclcpp_INCLUDE_DIRS}
+  ${pcl_conversions_INCLUDE_DIRS}
 )
 
 add_definitions(${EIGEN3_DEFINITIONS})
 add_definitions(${OpenCV_DEFINITIONS})
 
-# find_library(KARTO_LIB kartoSlamToolbox
-#   PATHS ${CMAKE_PREFIX_PATH}/../lib  
-#   NO_DEFAULT_PATH
-#   REQUIRED
-# )
 
-target_include_directories(DBoW2 PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}
-)
-# ORBextractor
 add_library(ORBextractor src/ORBextractor.cpp)
 target_link_libraries(ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES})
 ament_target_dependencies(ORBextractor rclcpp sensor_msgs std_msgs cv_bridge OpenCV)
+
+add_library(feature_extraction src/feature_extraction.cpp)
+target_link_libraries(feature_extraction ORBextractor DBoW2 kartoSlamToolbox ${OpenCV_LIBRARIES})
+ament_target_dependencies(feature_extraction rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
 
 add_library(feature_matching src/feature_matching.cpp)
 target_link_libraries(feature_matching ORBextractor DBoW2 kartoSlamToolbox ${OpenCV_LIBRARIES})
 ament_target_dependencies(feature_matching rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
 
-# # camera_utils
-# add_library(camera_utils src/camera_utils.cpp)
-# target_link_libraries(camera_utils ORBextractor DBoW2 kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
-# ament_target_dependencies(camera_utils rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
-
 # keyframes
 add_library(keyframes src/keyframes.cpp)
-target_link_libraries(keyframes ORBextractor DBoW2 kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(keyframes ORBextractor DBoW2 feature_extraction kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
 ament_target_dependencies(keyframes rclcpp tf2 tf2_ros tf2_geometry_msgs sensor_msgs std_msgs cv_bridge OpenCV)
 
-# # Main feature extraction node
-# add_executable(camera_feature_extractor src/camera_feature_extraction_node.cpp)
-# target_link_libraries(camera_feature_extractor ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
-# ament_target_dependencies(camera_feature_extractor rclcpp sensor_msgs tf2 tf2_ros tf2_geometry_msgs cv_bridge OpenCV)
+# Main feature extraction node
+add_executable(camera_feature_extractor src/camera_feature_extraction_node.cpp)
+target_link_libraries(camera_feature_extractor  ORBextractor DBoW2 feature_extraction keyframes feature_matching kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
+ament_target_dependencies(camera_feature_extractor rclcpp sensor_msgs tf2 tf2_ros tf2_geometry_msgs cv_bridge OpenCV)
 
-# add_library(camera_loop_closure_assistant src/camera_loop_closure_assistant.cpp)
-# target_link_libraries(camera_loop_closure_assistant ORBextractor kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
-# ament_target_dependencies(camera_loop_closure_assistant rclcpp tf2_geometry_msgs nav_msgs visualization_msgs std_srvs tf2_ros OpenCV)
+add_library(camera_loop_closure_assistant src/camera_loop_closure_assistant.cpp)
+target_link_libraries(camera_loop_closure_assistant ORBextractor DBoW2 feature_extraction keyframes feature_matching kartoSlamToolbox ${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
+ament_target_dependencies(camera_loop_closure_assistant rclcpp tf2_geometry_msgs nav_msgs visualization_msgs std_srvs tf2_ros OpenCV)
 
+add_executable(DBoW2_test test/DBoW2_test.cpp)
+target_link_libraries(DBoW2_test feature_matching ORBextractor DBoW2 feature_extraction ${OpenCV_LIBRARIES} )
 
-install(TARGETS DBoW2
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
+add_executable(loop_closure_test_node src/loop_closure_test_node.cpp)
+target_link_libraries(loop_closure_test_node ORBextractor DBoW2 feature_extraction feature_matching ${OpenCV_LIBRARIES})
+ament_target_dependencies(loop_closure_test_node rclcpp sensor_msgs cv_bridge OpenCV)
+
+add_executable(csm_3d_node src/csm_3d_node.cpp)
+target_link_libraries(csm_3d_node ${PCL_LIBRARIES})
+ament_target_dependencies(csm_3d_node rclcpp sensor_msgs geometry_msgs tf2 tf2_geometry_msgs PCL)
+
+add_executable(3D_CSM_test test/3D_CSM_test.cpp)
+target_link_libraries(3D_CSM_test ${PCL_LIBRARIES})
+ament_target_dependencies(3D_CSM_test rclcpp sensor_msgs geometry_msgs tf2 tf2_geometry_msgs PCL)
+
+install(TARGETS loop_closure_test_node 
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY DBoW2/
-  DESTINATION include/DBoW2
-  FILES_MATCHING PATTERN "*.h"
+install(TARGETS camera_feature_extractor 
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY DUtils/
-  DESTINATION include/DUtils
-  FILES_MATCHING PATTERN "*.h"
+install(TARGETS csm_3d_node 
+  DESTINATION lib/${PROJECT_NAME}
 )
+
 install(
   PROGRAMS src/tf_broadcaster_node.py
   DESTINATION lib/${PROJECT_NAME}
@@ -161,17 +163,22 @@ install(TARGETS ORBextractor
   RUNTIME DESTINATION bin
 )
 
+install(TARGETS feature_extraction
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 install(TARGETS feature_matching
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
 
-# install(TARGETS camera_utils
-#   ARCHIVE DESTINATION lib
-#   LIBRARY DESTINATION lib
-#   RUNTIME DESTINATION bin
-# )
+install(TARGETS camera_loop_closure_assistant
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 
 install(TARGETS keyframes
   ARCHIVE DESTINATION lib
@@ -181,6 +188,14 @@ install(TARGETS keyframes
 
 install(DIRECTORY include/
   DESTINATION include/
+)
+
+install(TARGETS DBoW2_test
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS 3D_CSM_test
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_export_include_directories(include)
