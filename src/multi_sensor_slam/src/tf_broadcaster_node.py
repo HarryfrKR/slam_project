@@ -10,10 +10,7 @@ class StaticTFBroadcaster(Node):
     def __init__(self):
         super().__init__('tf_broadcaster')
 
-        # Create static transform broadcaster
         self.tf_broadcaster = tf2_ros.StaticTransformBroadcaster(self)
-
-        # Publish static transforms
         self.publish_transforms()
 
     def publish_transforms(self):
@@ -34,7 +31,6 @@ class StaticTFBroadcaster(Node):
         t1.transform.rotation.z = q[2]
         t1.transform.rotation.w = q[3]
         
-
         # RealSense D435i -> base_link
         t2 = TransformStamped()
         t2.header.stamp = self.get_clock().now().to_msg()
