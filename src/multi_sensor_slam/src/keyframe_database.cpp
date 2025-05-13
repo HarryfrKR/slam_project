@@ -1,5 +1,5 @@
 // keyframe_database.cpp
-#include "multi_sensor_slam/keyframe_database.hpp"
+#include "multi_sensor_slam/keyframe_database.h"
 #include <algorithm>
 #include <iostream>
 

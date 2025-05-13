@@ -3,7 +3,7 @@
 #include <vector>
 #include <opencv2/core.hpp>
 #include <cv_bridge/cv_bridge.h>
-// #include <DBoW2/DBoW2/FeatureVector.h>
+#include <DBoW2/FeatureVector.h>
 #include <karto_sdk/Karto.h>
 
 namespace camera_utils {
@@ -11,7 +11,7 @@ namespace camera_utils {
 struct Keyframe {
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
-    //DBoW2::FeatureVector feat_vec;
+    DBoW2::BowVector bow_vec;
     karto::Pose2 estimated_robot_pose;
     rclcpp::Time timestamp;
     int index;

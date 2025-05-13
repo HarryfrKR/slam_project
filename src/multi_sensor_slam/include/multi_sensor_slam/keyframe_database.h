@@ -10,7 +10,7 @@
 #include <DBoW2/DBoW2/FORB.h>
 #include <DBoW2/DBoW2/TemplatedVocabulary.h>
 #include <DBoW2/DBoW2/BowVector.h>
-#include "multi_sensor_slam/keyframes.hpp"  // assumes Keyframe struct is defined here
+#include "multi_sensor_slam/keyframes.hpp" 
 
 namespace camera_utils {
 
