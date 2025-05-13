@@ -17,7 +17,9 @@ RUN apt-get update && apt-get install -y \
     libopencv-dev \
     libpcl-dev \
     python3-vcstool \
-    python3-colcon-common-extensions
+    python3-colcon-common-extensions \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
 
 # Install ORB-SLAM3 dependencies
@@ -65,6 +67,7 @@ RUN apt-get update && apt-get install -y \
     ros-humble-ros2bag \
     ros-humble-tf-transformations
 
+    
 # Install Ignition Fortress Gazebo
 RUN curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
