@@ -8,27 +8,46 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2/utils.h>  
 #include <karto_sdk/Karto.h>
+#include <filesystem>
 #include <rcpputils/filesystem_helper.hpp>
+
+#include <DBoW2/FeatureVector.h>
+#include <DBoW2/BowVector.h>
 
 #include "multi_sensor_slam/camera_feature_extraction_node.hpp"
 #include "multi_sensor_slam/feature_matching.hpp"
+#include "multi_sensor_slam/feature_extraction.hpp"
 
 using namespace std;
 using namespace cv;
 using namespace camera_utils;
 using namespace karto;
+using namespace orb;
 
 
 CameraFeatureExtractionNode::CameraFeatureExtractionNode(
     std::shared_ptr<camera_utils::KeyframeHolder> keyframe_holder)
-    : Node("camera_feature_extraction"), keyframe_holder_(keyframe_holder) {  
+    : Node("camera_feature_extractor"), keyframe_holder_(keyframe_holder) {  
 
     RCLCPP_INFO(this->get_logger(), "Initializing Camera Feature Extraction Node...");
 
     feature_extractor_ = std::make_shared<camera_utils::FeatureExtractor>();
+    feature_matcher_ = std::make_shared<camera_utils::FeatureMatcher>();
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, this);
     last_image_msg_ = nullptr;
+    
+    vocab_ = std::make_shared<ORBVocabulary>();
+    std::string vocab_path = "src/multi_sensor_slam/test/ORBvoc.txt";
+    if (!vocab_->loadFromTextFile(vocab_path)) {
+        RCLCPP_FATAL(this->get_logger(), "Failed to load vocabulary!");
+        rclcpp::shutdown();
+    }
+
+    std::filesystem::create_directory("loop_matches");
+    RCLCPP_INFO(this->get_logger(), "Vocabulary loaded. Ready for loop closure test.");
+
+
     image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
         "/camera/camera/color/image_raw", rclcpp::QoS(1), 
         std::bind(&CameraFeatureExtractionNode::imageCallback, this, std::placeholders::_1));
@@ -75,12 +94,14 @@ void CameraFeatureExtractionNode::imageCallback(const sensor_msgs::msg::Image::S
 
 void CameraFeatureExtractionNode::processKeyframe() {
     if (!last_image_msg_ || keypoints_.empty() || descriptors_.empty()) {
-        // RCLCPP_WARN(this->get_logger(), "Waiting for Image msg...");
+        RCLCPP_WARN(this->get_logger(), "Waiting for valid image message or extracted features...");
         return;
     }
 
     if (isKeyframe(last_image_msg_, keypoints_, descriptors_, this->now())) {
-        RCLCPP_INFO(this->get_logger(), "Saved new keyframe.");
+        // RCLCPP_INFO(this->get_logger(), "New keyframe detected and processed successfully.");
+    } else {
+        RCLCPP_INFO(this->get_logger(), "No new keyframe detected.");
     }
 }
 
@@ -100,6 +121,10 @@ std::pair<std::vector<cv::KeyPoint>, cv::Mat> CameraFeatureExtractionNode::extra
 bool CameraFeatureExtractionNode::isKeyframe(const sensor_msgs::msg::Image::SharedPtr msg, const std::vector<cv::KeyPoint>& keypoints, const cv::Mat& descriptors, rclcpp::Time time) {
     rclcpp::Time keyframe_time;
     cv::Mat image;
+
+    DBoW2::FeatureVector feat_vec;
+    DBoW2::BowVector bow_vec;
+
     try {
         image = cv_bridge::toCvCopy(msg, "bgr8")->image;
     } catch (const cv_bridge::Exception& e) {
@@ -116,19 +141,21 @@ bool CameraFeatureExtractionNode::isKeyframe(const sensor_msgs::msg::Image::Shar
     
     if (keyframe_holder_->size() == 0) {
         previous_keyframe_pose_ = estimatedPose; 
-        Keyframe new_keyframe{keypoints, descriptors.clone(), estimatedPose, keyframe_time, static_cast<int>(keyframe_holder_->size()) - 1};
+        feature_extractor_->transformToBoW(descriptors, vocab_, feat_vec, bow_vec);
+
+        Keyframe new_keyframe{keypoints, descriptors.clone(), bow_vec, estimatedPose, keyframe_time, static_cast<int>(keyframe_holder_->size()) - 1};
         keyframe_holder_->addKeyframe(new_keyframe);
         keyframe_holder_->addKeyframeImage(image);
         // RCLCPP_INFO(this->get_logger(), "First frame - Saving as keyframe.");
-        // std::string filename = keyframe_dir + "keyframe_0.png";
-        // cv::imwrite(filename, image);
+        std::string filename = keyframe_dir + "keyframe_0.png";
+        cv::imwrite(filename, image);
         return true;
     }
 
     try {
         // Get last keyframe and match features
         const Keyframe& last_kf = keyframe_holder_->getKeyframe(keyframe_holder_->size() - 1);
-        vector<DMatch> matches = feature_extractor_->matchFeatures(descriptors, last_kf.descriptors);
+        vector<DMatch> matches = feature_matcher_->matchFeatures(descriptors, last_kf.descriptors);
 
         if (matches.size() < 20) { 
             RCLCPP_WARN(this->get_logger(), "Too few matches for relative pose estimation.");
@@ -137,7 +164,7 @@ bool CameraFeatureExtractionNode::isKeyframe(const sensor_msgs::msg::Image::Shar
 
         // Compute relative pose
         Pose2 relativePose;
-        feature_extractor_->computeRelativePose(matches, keypoints, last_kf.keypoints, relativePose);
+        feature_matcher_->computeRelativePose(matches, keypoints, last_kf.keypoints, relativePose);
 
         // Define motion thresholds
         double translation_threshold = 0.1;  // cm
@@ -153,16 +180,17 @@ bool CameraFeatureExtractionNode::isKeyframe(const sensor_msgs::msg::Image::Shar
         // Check if movement is significant
         if (translation_magnitude > translation_threshold || dtheta > rotation_threshold) {
             previous_keyframe_pose_ = estimatedPose; 
-            Keyframe new_keyframe{keypoints, descriptors.clone(), estimatedPose, keyframe_time, static_cast<int>(keyframe_holder_->size()) - 1};
+            feature_extractor_->transformToBoW(descriptors, vocab_, feat_vec, bow_vec);
+            Keyframe new_keyframe{keypoints, descriptors.clone(), bow_vec, estimatedPose, keyframe_time, static_cast<int>(keyframe_holder_->size()) - 1};
             keyframe_holder_->addKeyframe(new_keyframe);
             keyframe_holder_->addKeyframeImage(image);
             // RCLCPP_INFO(this->get_logger(), "Added new keyframe with estimated pose (%.2f, %.2f, %.2f)",
             //             estimatedPose.GetX(), estimatedPose.GetY(), estimatedPose.GetHeading());
                
             // Save the image with the keyframe ID
-            // int keyframe_id = keyframe_holder_->size() - 1;
-            // std::string filename = keyframe_dir + "keyframe_" + std::to_string(keyframe_id) + "_" + std::to_string(keyframe_time.seconds()) + ".png";
-            // cv::imwrite(filename, image);
+            int keyframe_id = keyframe_holder_->size() - 1;
+            std::string filename = keyframe_dir + "keyframe_" + std::to_string(keyframe_id) + ".png";
+            cv::imwrite(filename, image);
 
             return true;
         } else {
@@ -178,7 +206,7 @@ bool CameraFeatureExtractionNode::isKeyframe(const sensor_msgs::msg::Image::Shar
 
 void CameraFeatureExtractionNode::publishKeypoints(const vector<KeyPoint>& keypoints, const cv::Mat &image) {
     if (keypoints.empty()) {
-        RCLCPP_WARN(this->get_logger(), "No keypoints detected, skipping publish.");
+        // RCLCPP_WARN(this->get_logger(), "No keypoints detected, skipping publish.");
         return;
     }
 

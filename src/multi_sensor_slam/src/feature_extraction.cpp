@@ -15,10 +15,10 @@ namespace camera_utils {
 
 FeatureExtractor::FeatureExtractor() {
     try {
-        int nFeatures = 200;
+        int nFeatures = 600;
         float scaleFactor = 1.2f;
         int nLevels = 8;
-        int iniThFAST = 30;
+        int iniThFAST = 20;
         int minThFAST = 10;
 
         orb_extractor_ = std::make_unique<orb::ORBextractor>(
@@ -32,7 +32,8 @@ FeatureExtractor::FeatureExtractor() {
         RCLCPP_ERROR(rclcpp::get_logger("FeatureExtraction"), " Exception in ORBextractor constructor: %s", e.what());
     }
 }
-    
+
+
 void FeatureExtractor::extractFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors) {
     if (image.empty()) {
         RCLCPP_ERROR(rclcpp::get_logger("FeatureExtraction"), "ERROR: Received empty image! Skipping feature extraction.");
@@ -48,7 +49,16 @@ void FeatureExtractor::extractFeatures(const cv::Mat& image, std::vector<cv::Key
     } 
 
     orb_extractor_->operator()(image, noArray(), keypoints, descriptors, vLappingArea);
+    orb_extractor_->operator()(image, noArray(), keypoints, descriptors, vLappingArea);
     // RCLCPP_INFO(rclcpp::get_logger("FeatureExtraction"), "Extracted %lu keypoints.", keypoints.size());
 
 } 
+
+void FeatureExtractor::transformToBoW(const cv::Mat& descriptors, std::shared_ptr<ORBVocabulary> vocab, DBoW2::FeatureVector& feat_vec, DBoW2::BowVector& bow_vec) {
+    std::vector<cv::Mat> descriptor_vec;
+    for (int i = 0; i < descriptors.rows; ++i)
+        descriptor_vec.push_back(descriptors.row(i).clone());
+
+    vocab->transform(descriptor_vec, bow_vec, feat_vec, 6);
+}
 }  // namespace camera_utils

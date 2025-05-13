@@ -11,19 +11,21 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <karto_sdk/Karto.h>
 
-// #include "multi_sensor_slam/camera_utils.hpp"
 #include "multi_sensor_slam/ORBextractor.h"
 #include "multi_sensor_slam/keyframes.hpp"
-#include "multi_sensor_slam/feature_extraction.hpp"
 #include "multi_sensor_slam/feature_matching.hpp"
+#include "multi_sensor_slam/feature_extraction.hpp"
+#include "multi_sensor_slam/ORBVocabulary.h"
 
 
 class CameraFeatureExtractionNode : public rclcpp::Node {
 public:
     CameraFeatureExtractionNode(std::shared_ptr<camera_utils::KeyframeHolder> keyframe_holder);
     std::shared_ptr<camera_utils::FeatureExtractor> feature_extractor_; 
+    std::shared_ptr<camera_utils::FeatureMatcher> feature_matcher_;
     karto::Pose2 getRobotPose();
     karto::Pose2 previous_keyframe_pose_;
+    std::shared_ptr<orb::ORBVocabulary> vocab_;
 private:
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr orb_feature_pub_;
@@ -36,6 +38,7 @@ private:
     std::shared_ptr<sensor_msgs::msg::Image> last_image_msg_; 
     std::vector<cv::KeyPoint> keypoints_;
     cv::Mat descriptors_; 
+
     void imageCallback(const sensor_msgs::msg::Image::SharedPtr msg);
     void processKeyframe();
     void publishKeypoints(const std::vector<cv::KeyPoint>& keypoints, const cv::Mat &image);
